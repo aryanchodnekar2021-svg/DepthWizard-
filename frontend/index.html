@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DepthWizard Visualization</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        #canvas-container { position: absolute; top: 0; left: 0; right: 0; bottom: 0; }
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: white;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px;
+            border-radius: 8px;
+            pointer-events: auto; /* let buttons be clickable */
+            z-index: 100;
+            max-width: 350px;
+        }
+        button, input, select {
+            margin-top: 10px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled {
+            background: #444;
+            color: #888;
+            cursor: not-allowed;
+        }
+        #upload-section, #demo-section {
+            padding-bottom: 10px;
+            border-bottom: 1px solid #444;
+            margin-bottom: 10px;
+        }
+        #loading {
+            display: none;
+            color: #ffcc00;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+    <!-- Import map for Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div id="ui-layer">
+        <div id="upload-section">
+            <h3>DepthWizard</h3>
+            <label for="image-upload">Upload RGB Image:</label><br>
+            <input type="file" id="image-upload" accept="image/*"><br>
+            <button id="process-btn">Process</button>
+            <div id="loading">Processing... (this may take a minute)</div>
+            <div id="error-msg" style="color: red; margin-top: 10px;"></div>
+        </div>
+        
+        <div id="demo-section">
+            <label for="demo-select">Or load cached demo region:</label><br>
+            <select id="demo-select">
+                <option value="">-- Select Demo Region --</option>
+                <option value="forest">Dummy Forest Region</option>
+            </select>
+        </div>
+
+        <div id="controls-section" style="display: none;">
+            <div style="margin-bottom: 10px; font-size: 0.9em;">
+                <b>Controls:</b> WASD to move, Mouse to look, Space/Shift to go Up/Down.<br>Click canvas to lock cursor.
+            </div>
+            <div style="margin-bottom: 10px; font-size: 0.9em;">
+                <b>Toggle:</b> Press 'C' to switch between Fly and Inspect modes.
+            </div>
+            <div style="display: flex; gap: 5px; flex-wrap: wrap;">
+                <button disabled>Minimap (Stub)</button>
+                <button disabled>Height Ramp (Stub)</button>
+                <button disabled>Slope Shading (Stub)</button>
+            </div>
+        </div>
+    </div>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

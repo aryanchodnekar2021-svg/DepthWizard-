@@ -1,0 +1,10 @@
+# Ignore sample images
+samples/
+*.png
+*.jpg
+*.jpeg
+
+# Ignore DEM tiles
+srtm/
+*.tif
+*.tiff
