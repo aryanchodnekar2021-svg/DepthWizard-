@@ -63,7 +63,7 @@ function init() {
             loadingDiv.textContent = "Processing... (this may take a minute)";
             loadingDiv.style.display = 'block';
             
-            const response = await fetch('http://localhost:8000/process', {
+            const response = await fetch('http://localhost:8001/process', {
                 method: 'POST',
                 body: formData
             });
@@ -72,7 +72,7 @@ function init() {
             const data = await response.json();
             if (data.error) throw new Error(data.error);
 
-            const baseUrl = 'http://localhost:8000';
+            const baseUrl = 'http://localhost:8001';
             await renderTerrain(baseUrl + data.heightmap_url, baseUrl + data.texture_url);
         } catch (err) {
             errorMsg.textContent = "Failed to process image: " + err.message;
