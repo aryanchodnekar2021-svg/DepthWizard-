@@ -147,8 +147,8 @@ async def process_image(image: UploadFile = File(...)):
         save_output(dsm_path, dsm_array, metadata, mode)
         dsm_url = f"/outputs/{dsm_filename}"
 
-        # Heightmap (always PNG for Three.js visualization)
-        d_min, d_max = dsm_array.min(), dsm_array.max()
+        # Heightmap (always 16-bit PNG for Three.js visualization)
+        d_min, d_max = float(dsm_array.min()), float(dsm_array.max())
         if d_max > d_min:
             heightmap_norm = (dsm_array - d_min) / (d_max - d_min)
         else:
@@ -169,6 +169,8 @@ async def process_image(image: UploadFile = File(...)):
                 if mode == "metric"
                 else "relative (normalized 0-1, no metric meaning)"
             ),
+            "elevation_min": d_min,
+            "elevation_max": d_max,
             "is_georeferenced": raster_meta.is_georeferenced,
             "input": {
                 "width": raster_meta.width,
