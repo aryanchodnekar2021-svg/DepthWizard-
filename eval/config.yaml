@@ -1,0 +1,55 @@
+# DepthWizard Real-World Evaluation Configuration
+#
+# This file configures evaluation runs against real RGB + reference DSM pairs.
+# Do NOT fabricate metrics — only include datasets you actually have.
+#
+# Usage:
+#   python eval/run_eval.py --config eval/config.yaml
+#
+# Each entry defines:
+#   - dataset: Human-readable name
+#   - terrain_type: SIH category (urban | sparse | hilly | forest)
+#   - image_path: Path to the RGB input image
+#   - reference_path: Path to the reference DSM (GeoTIFF preferred)
+#   - crs: Coordinate reference system (e.g. EPSG:4326, EPSG:32643)
+#   - resolution: Expected pixel size in CRS units (meters for projected)
+#   - preprocessing: Any preprocessing applied (e.g. "none", "contrast_enhance")
+#   - notes: Freeform notes about the dataset
+
+datasets: []
+  # Example entry (uncomment and fill in when real data is available):
+  # - dataset: "Pune Urban Tile 01"
+  #   terrain_type: urban
+  #   image_path: "data/samples/pune_urban_01_rgb.tif"
+  #   reference_path: "data/samples/pune_urban_01_dsm.tif"
+  #   crs: "EPSG:32643"
+  #   resolution: 0.5  # meters
+  #   preprocessing: none
+  #   notes: "Captured via drone at 120m AGL"
+  #
+  # - dataset: "Western Ghats Forest Patch"
+  #   terrain_type: forest
+  #   image_path: "data/samples/western_ghats_forest_rgb.tif"
+  #   reference_path: "data/samples/western_ghats_forest_dsm.tif"
+  #   crs: "EPSG:32643"
+  #   resolution: 1.0
+  #   preprocessing: none
+  #   notes: "Dense canopy, challenging for monocular depth"
+
+# Global evaluation settings
+settings:
+  # Minimum valid pixel coverage (%) required for a comparison to be valid
+  min_coverage_pct: 50.0
+
+  # Whether to generate error map rasters
+  save_error_maps: true
+
+  # Output directory for evaluation results
+  output_dir: "eval/results"
+
+  # Terrain categories for SIH 26175
+  terrain_categories:
+    urban: "Dense urban areas with buildings and roads"
+    sparse: "Sparse vegetation, rural areas"
+    hilly: "Hilly terrain with moderate slope"
+    forest: "Dense forest canopy"
