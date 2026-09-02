@@ -84,6 +84,52 @@ Compares predicted vs reference DSMs (must be spatially aligned):
 - `POST /classify` — Terrain classification from uploaded image
 - `POST /evaluate` — Compare predicted DSM against reference (file paths in outputs/)
 
+## Real Data Validation
+
+### Depth Estimation
+
+The backend uses `depth-anything/Depth-Anything-V2-Small-hf` via HuggingFace `transformers`. Run inference via the API:
+
+```bash
+curl -X POST http://localhost:8000/process \
+  -F "file=@data/samples/my_image.jpg"
+```
+
+Check model status:
+
+```bash
+curl http://localhost:8000/model/status
+```
+
+### Dataset Adapters
+
+For validating against real-world data, use the dataset adapters:
+
+```python
+from backend.datasets import SRTMAdapter, ISPRSAdapter
+
+# SRTM elevation data
+srtm = SRTMAdapter(srtm_dir="data/srtm/")
+tiles = srtm.list_samples()
+arr = srtm.load_sample("N27E085")
+
+# ISPRS Potsdam semantic labeling
+isprs = ISPRSAdapter(data_dir="data/isprs_potsdam/")
+tiles = isprs.list_samples()
+rgb, dsm = isprs.load_sample("tile_1")
+ref = isprs.get_reference_dsm("tile_1")
+```
+
+### Benchmark
+
+Run inference benchmarks across image sizes:
+
+```bash
+python scripts/benchmark.py
+```
+
+Results are saved to `outputs/benchmark.json`.
+
 ## Limitations
 
 - Slope from relative depth reflects shape only, not true metric slope
