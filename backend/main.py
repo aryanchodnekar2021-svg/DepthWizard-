@@ -18,6 +18,9 @@ from fastapi.staticfiles import StaticFiles
 from backend.depth.estimator import estimate_depth
 from backend.calibration.pipeline import calibrate, save_output
 from backend.geo.raster_inspect import inspect_raster
+from backend.analysis.slope import compute_slope
+from backend.analysis.classification import classify_terrain, get_category_legend
+from backend.analysis.comparison import compute_error_map
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -244,3 +247,226 @@ async def srtm_status():
         "tiles": tiles,
         "tile_count": len(tiles),
     }
+
+
+@app.post("/slope")
+async def compute_slope_endpoint(image: UploadFile = File(...)):
+    """
+    Compute slope from an uploaded image's depth map.
+
+    Runs depth estimation, computes slope in degrees, and returns
+    a 16-bit slope raster plus metadata.
+    """
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+    _, ext = os.path.splitext(image.filename)
+    if ext.lower() not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format '{ext}'. Supported: {sorted(allowed_extensions)}",
+        )
+
+    input_path = os.path.join(outputs_dir, f"slope_input_{image.filename}")
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    try:
+        img_pil = Image.open(input_path).convert("RGB")
+        img_np = np.array(img_pil)
+
+        # Estimate depth (relative, 0-1 range)
+        relative_depth = estimate_depth(img_np, backbone="depth_anything_v2")
+
+        # Compute slope — for relative depth, cell sizes are 1.0 (shape-only)
+        slope_deg = compute_slope(relative_depth, cell_size_x=1.0, cell_size_y=1.0)
+
+        # Save slope as 16-bit PNG: map 0-90 degrees → 0-65535
+        slope_min = 0.0
+        slope_max = 90.0
+        slope_norm = np.clip(slope_deg / slope_max, 0.0, 1.0)
+        slope_16bit = (slope_norm * 65535).astype(np.uint16)
+
+        slope_filename = f"slope_{image.filename}"
+        if not slope_filename.lower().endswith(".png"):
+            slope_filename += ".png"
+        slope_path = os.path.join(outputs_dir, slope_filename)
+        Image.fromarray(slope_16bit).save(slope_path)
+
+        # Classification
+        classification = classify_terrain(slope_deg)
+        class_filename = f"classification_{image.filename}"
+        if not class_filename.lower().endswith(".png"):
+            class_filename += ".png"
+        class_path = os.path.join(outputs_dir, class_filename)
+        Image.fromarray(classification).save(class_path)
+
+        return {
+            "status": "ok",
+            "analysis": "slope",
+            "units": "degrees",
+            "slope_min": slope_min,
+            "slope_max": slope_max,
+            "slope_url": f"/outputs/{slope_filename}",
+            "classification_url": f"/outputs/{class_filename}",
+            "legend": get_category_legend(),
+            "warnings": [
+                "Slope computed from relative depth (shape only). "
+                "For metric slope, process a georeferenced input with calibration."
+            ],
+        }
+    except Exception as e:
+        logger.error(f"Slope computation failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/classify")
+async def classify_terrain_endpoint(image: UploadFile = File(...)):
+    """
+    Classify terrain from an uploaded image.
+
+    Computes depth → slope → terrain categories.
+    """
+    allowed_extensions = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+    _, ext = os.path.splitext(image.filename)
+    if ext.lower() not in allowed_extensions:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file format '{ext}'. Supported: {sorted(allowed_extensions)}",
+        )
+
+    input_path = os.path.join(outputs_dir, f"classify_input_{image.filename}")
+    with open(input_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+
+    try:
+        img_pil = Image.open(input_path).convert("RGB")
+        img_np = np.array(img_pil)
+
+        relative_depth = estimate_depth(img_np, backbone="depth_anything_v2")
+        slope_deg = compute_slope(relative_depth)
+        classification = classify_terrain(slope_deg)
+
+        class_filename = f"classification_{image.filename}"
+        if not class_filename.lower().endswith(".png"):
+            class_filename += ".png"
+        class_path = os.path.join(outputs_dir, class_filename)
+        Image.fromarray(classification).save(class_path)
+
+        # Count pixels per category
+        from collections import Counter
+
+        counts = Counter(classification.flatten().tolist())
+
+        return {
+            "status": "ok",
+            "classification_url": f"/outputs/{class_filename}",
+            "legend": get_category_legend(),
+            "pixel_counts": {str(k): int(v) for k, v in counts.items()},
+            "total_pixels": int(classification.size),
+        }
+    except Exception as e:
+        logger.error(f"Classification failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/evaluate")
+async def evaluate_endpoint(
+    predicted_path: str,
+    reference_path: str,
+):
+    """
+    Compare a predicted DSM against a reference DSM.
+
+    Both files must exist in the outputs/ directory.
+    Returns accuracy metrics and error map.
+    """
+    pred_full = os.path.join(outputs_dir, os.path.basename(predicted_path))
+    ref_full = os.path.join(outputs_dir, os.path.basename(reference_path))
+
+    if not os.path.exists(pred_full):
+        raise HTTPException(
+            status_code=404, detail=f"Predicted file not found: {predicted_path}"
+        )
+    if not os.path.exists(ref_full):
+        raise HTTPException(
+            status_code=404, detail=f"Reference file not found: {reference_path}"
+        )
+
+    try:
+        import rasterio
+
+        # Load predicted DSM
+        with rasterio.open(pred_full) as src:
+            pred_array = src.read(1).astype(np.float64)
+            pred_nodata = src.nodata
+            pred_transform = src.transform
+            pred_crs = str(src.crs) if src.crs else None
+
+        # Load reference DSM
+        with rasterio.open(ref_full) as src:
+            ref_array = src.read(1).astype(np.float64)
+            ref_nodata = src.nodata
+            ref_transform = src.transform
+            ref_crs = str(src.crs) if src.crs else None
+
+        # Basic alignment check
+        alignment = {
+            "predicted_shape": list(pred_array.shape),
+            "reference_shape": list(ref_array.shape),
+            "predicted_crs": pred_crs,
+            "reference_crs": ref_crs,
+            "shape_match": pred_array.shape == ref_array.shape,
+            "crs_match": pred_crs == ref_crs,
+        }
+
+        if pred_array.shape != ref_array.shape:
+            return {
+                "status": "error",
+                "error": (
+                    f"Shape mismatch: predicted {pred_array.shape} vs "
+                    f"reference {ref_array.shape}. Resample to matching grid first."
+                ),
+                "alignment": alignment,
+            }
+
+        # Compute error map and metrics
+        result = compute_error_map(pred_array, ref_array)
+
+        # Save error map as raster
+        error_map = result.pop("error_map")
+        abs_error_map = result.pop("abs_error_map")
+
+        error_filename = "error_map.tif"
+        error_path = os.path.join(outputs_dir, error_filename)
+
+        # Write error map preserving geospatial metadata from predicted
+        profile = {
+            "driver": "GTiff",
+            "dtype": "float64",
+            "width": error_map.shape[1],
+            "height": error_map.shape[0],
+            "count": 1,
+            "crs": None,
+            "transform": None,
+        }
+
+        try:
+            with rasterio.open(pred_full) as src:
+                profile.update(crs=src.crs, transform=src.transform)
+        except Exception:
+            pass
+
+        with rasterio.open(error_path, "w", **profile) as dst:
+            dst.write(error_map, 1)
+
+        return {
+            "status": "ok",
+            "alignment": alignment,
+            "metrics": {k: v for k, v in result.items()},
+            "error_map_url": f"/outputs/{error_filename}",
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Evaluation failed: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=str(e))
