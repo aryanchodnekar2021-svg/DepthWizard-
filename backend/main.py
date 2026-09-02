@@ -15,7 +15,11 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from backend.depth.estimator import estimate_depth
+from backend.depth.estimator import (
+    estimate_depth,
+    get_model_status,
+    estimate_depth_tiled,
+)
 from backend.calibration.pipeline import calibrate, save_output
 from backend.geo.raster_inspect import inspect_raster
 from backend.analysis.slope import compute_slope
@@ -49,6 +53,16 @@ app.mount("/outputs", StaticFiles(directory=outputs_dir), name="outputs")
 def health_check():
     """Health check endpoint."""
     return {"status": "ok", "service": "depthwizard-api"}
+
+
+@app.get("/model/status")
+def model_status():
+    """Return model health, device, and inference statistics."""
+    status = get_model_status()
+    return {
+        "status": "ok",
+        "model": status,
+    }
 
 
 @app.get("/inspect")
@@ -218,8 +232,15 @@ async def process_image(image: UploadFile = File(...)):
                 "Output is relative, not metric."
             )
 
+        # Add inference timing from model stats
+        model_stats = get_model_status()
+        response["inference_ms"] = model_stats.get("last_inference_ms")
+
         return response
 
+    except RuntimeError as e:
+        logger.error(f"Model error: {e}")
+        raise HTTPException(status_code=503, detail=f"Model unavailable: {e}")
     except Exception as e:
         logger.error(f"Processing failed: {traceback.format_exc()}")
         return {"status": "error", "error": str(e)}
