@@ -1,0 +1,39 @@
+{
+  "step_16_geotiff": {
+    "path": "D:\\SIH MAPDEPTH\\data\\..\\outputs\\real_metric_dsm.tif",
+    "crs": "EPSG:4326",
+    "bounds": {
+      "west": 73.36,
+      "south": 18.02,
+      "east": 74.36,
+      "north": 19.02
+    },
+    "shape": [
+      1024,
+      1024
+    ],
+    "dtype": "float32",
+    "nodata": -9999,
+    "verified": true
+  },
+  "step_17_reference_evaluation": {
+    "status": "BLOCKED",
+    "reason": "No reference DSM/elevation surface available",
+    "required": "LiDAR DSM, photogrammetric DSM, or high-res DEM for the same geographic area"
+  },
+  "step_18_validation_separation": {
+    "calibration_validation": {
+      "status": "COMPLETED (with caveat)",
+      "method": "linear_fit",
+      "scale": 0.017491,
+      "offset": 558.19,
+      "rmse_m": 69.74,
+      "mae_m": 59.05,
+      "caveat": "Uses SYNTHETIC SRTM placeholder. Calibration values are meaningless without real elevation data."
+    },
+    "independent_dsm_validation": {
+      "status": "BLOCKED",
+      "reason": "No reference DSM available"
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "dem_source": "SYNTHETIC placeholder (OpenTopography API requires auth key)",
+  "location": {
+    "lat": 18.52,
+    "lon": 73.86
+  },
+  "tile": "N18E073",
+  "depth_shape": [
+    1024,
+    1024
+  ],
+  "srtm_shape": [
+    1201,
+    1201
+  ],
+  "valid_samples": 1048576,
+  "total_pixels": 1048576,
+  "method": "linear",
+  "scale": 0.017490533013392914,
+  "offset": 558.1890386207727,
+  "rmse": 69.74187999558978,
+  "mae": 59.05294334042907,
+  "metric_dsm_range": [
+    558.1890258789062,
+    562.6491088867188
+  ],
+  "metric_dsm_mean": 560.6925048828125,
+  "data_type": "real_depth_synthetic_srtm",
+  "note": "Real Depth Anything V2 output calibrated against synthetic SRTM placeholder. NOT real validation."
+}

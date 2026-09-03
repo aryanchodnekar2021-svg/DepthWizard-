@@ -31,3 +31,10 @@ data/srtm/
 data/eval_tiles/
 *.tif.aux.xml
 .pytest_cache/
+.opencode/
+
+# Large generated outputs (regenerable)
+outputs/*.npy
+outputs/*.tif
+outputs/*.png
+outputs/*.npz

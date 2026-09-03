@@ -1,0 +1,27 @@
+{
+  "input_file": "real_test_landscape.jpg",
+  "input_size": [
+    1024,
+    1024
+  ],
+  "input_mode": "RGB",
+  "model": "depth-anything/Depth-Anything-V2-Small-hf",
+  "device": "cpu",
+  "inference_time_s": 21.4,
+  "output_shape": [
+    1024,
+    1024
+  ],
+  "output_dtype": "float32",
+  "output_min": 0.0,
+  "output_max": 255.0,
+  "output_mean": 143.13211059570312,
+  "output_std": 44.71706008911133,
+  "percentiles": {
+    "p5": 69.0,
+    "p50": 139.0,
+    "p95": 229.0
+  },
+  "data_type": "real_photograph",
+  "note": "This is a real RGB photograph processed through Depth Anything V2. NOT satellite data."
+}
