@@ -1,0 +1,222 @@
+# DepthWizard Calibration R&D — Reproducible Experiment Configuration
+# Every experiment must be reproducible from this file.
+# Dataset provenance, method assumptions, and spatial split are explicit.
+
+# Global reproducibility
+seed: 42
+git_commit: "2fb1700" # will be overwritten by runner with actual HEAD
+model: "depth-anything/Depth-Anything-V2-Small-hf"
+device: "cpu"
+timestamp: "2026-05-13T00:00:00Z" # overwritten by runner
+
+# Datasets — each entry must have real files, not fabricated
+# If no real paired RGB+reference DSM exists, datasets stays empty and runner MUST stop numerical experiments
+datasets: []
+  # Example (uncomment when real data available):
+  # - name: "pune_tile_18E073"
+  #   terrain_type: "hilly"  # urban | sparse | hilly | forest | NOT AVAILABLE if unknown
+  #   image_path: "data/samples/real_test_landscape.jpg"  # RGB input, may be plain JPG (no CRS)
+  #   # For metric calibration, image must be GeoTIFF with CRS/transform OR paired with DEM bounds
+  #   dem_source: "srtm"  # srtm | local_dem
+  #   dem_path: "data/srtm/N18E073.tif"
+  #   reference_dsm_path: null  # MUST be independent from calibration DEM; null if unavailable
+  #   reference_provenance: null  # "LiDAR" | "photogrammetric" | "high_quality" | null
+  #   crs: "EPSG:4326"
+  #   resolution: 0.00083  # deg for EPSG:4326, meters for projected
+  #   preprocessing: "none"
+  #   notes: "Single real landscape JPG + SRTM 90m tile (N18E073). No independent reference DSM."
+
+# DEM sources
+dem_sources:
+  srtm:
+    dir: "data/srtm"
+    resolution_m: 90 # actual file is 90m (3 arcsec), not 30m as documented
+    crs: "EPSG:4326"
+    vertical_datum: "EGM96"
+    nodata: -9999
+
+# Calibration methods — every method states assumptions explicitly
+methods:
+  affine:
+    enabled: true
+    # H = a*D + b, least squares
+    assumption: "Depth correlates linearly with elevation; DEM is coarse truth"
+    outlier_method: "iqr"
+    outlier_factor: 3.0
+    subsample_limit: 50000
+
+  robust_affine:
+    enabled: true
+    # H = a*D + b with RANSAC
+    assumption: "Linear relation but with heavy outliers; RANSAC rejects"
+    residual_threshold: null # auto
+    min_samples: 0.5
+
+  dem_residual:
+    enabled: true
+    # H_pred = H_DEM + alpha * normalized_relative_residual
+    assumption: "Relative component adds high-frequency detail to coarse DEM"
+    alpha: 1.0
+
+  local_normalized:
+    enabled: true
+    # Locally z-scored residual fusion
+    assumption: "Local normalization removes global bias, preserves structure"
+    patch_size: 64
+
+  inverse_depth:
+    enabled: true
+    # H = a*(1/(D+eps)) + b
+    assumption: "Inverse depth (disparity) may correlate better with elevation"
+    epsilon: 1.0e-06
+
+  piecewise_linear:
+    enabled: true
+    # Piecewise n_bins affine segments
+    assumption: "Relation is nonlinear; piecewise linear approximates"
+    n_bins: 3
+
+  frequency_fusion:
+    enabled: true
+    # Gaussian lowpass decomposition, H = global_affine(D) + highfreq(DEM)
+    assumption: "Coarse DEM provides low-freq, monocular adds high-freq"
+    lowpass_sigma: 10.0
+    alpha: 1.0
+
+# Data alignment — must be identical for all methods
+alignment:
+  required_overlap_pct: 50.0 # fail if overlap < this
+  resampling: "bilinear" # for DEM reprojection
+  record:
+    - rgb_crs
+    - dem_crs
+    - rgb_bounds
+    - dem_bounds
+    - rgb_resolution
+    - dem_resolution
+    - aligned_resolution
+    - overlap_pct
+    - valid_sample_count
+
+# Frequency decomposition
+frequency:
+  sigma: 10.0 # pixels, for gaussian lowpass
+  investigate_highfreq_addition: true
+  description: "SRTM ~90m, RGB/depth ~1-5m; pixel-wise agreement not expected; test coarse+highfreq fusion"
+
+# Scale fitting — metrics before/after, never hide baseline
+metrics:
+  - valid_samples
+  - scale
+  - offset
+  - rmse
+  - mae
+  - bias
+  - pearson_correlation
+  - median_ae
+  - p90
+  - p95
+  - residual_std
+  - r_squared
+metrics_report_before_after: true
+
+# Robustness — must fail safely
+robustness_cases:
+  - nan
+  - nodata
+  - extreme_outliers
+  - low_overlap
+  - constant_depth
+  - constant_dem
+  - small_sample
+  - mismatched_crs
+  - mismatched_resolution
+
+# Spatial cross-validation — prevent leakage
+spatial_cv:
+  enabled: true
+  n_folds: 5
+  block_size_px: 64
+  min_separation_blocks: 2
+  seed: 42
+  min_valid_fraction: 0.1
+  strategy: "block_holdout" # or left_right_split
+
+# Reference DSM evaluation — independent from calibration DEM
+reference_evaluation:
+  require_independent: true
+  hierarchy:
+    [
+      "LiDAR",
+      "photogrammetric",
+      "high_quality",
+      "coarse_dem_as_calibration_only",
+    ]
+  provenance_field: "reference_provenance"
+
+# Terrain-specific evaluation
+terrain_categories: ["urban", "sparse", "hilly", "forest"]
+terrain_assignment: "only_when_justified_by_metadata" # else NOT AVAILABLE
+
+# Diagnostic visualizations — 10 per real experiment, outside Git
+visualizations:
+  output_dir: "outputs/calibration_rnd"
+  ignore_in_git: true
+  plots:
+    - rgb_image
+    - raw_relative_depth
+    - normalized_relative_surface
+    - coarse_dem
+    - calibrated_dsm
+    - reference_dsm # if available
+    - absolute_error
+    - residual_map
+    - scatter_plot
+    - histogram_of_errors
+  engine: "matplotlib"
+
+# Calibration quality diagnostics
+quality_diagnostics:
+  - r_squared # not substitute for DSM accuracy
+  - residual_mean
+  - residual_std
+  - residual_median
+  - residual_p90
+  - residual_p95
+quality_spatial_structure_check: true # flag if residuals show spatial pattern
+
+# Local calibration experiment
+local_calibration:
+  enabled: true
+  block_sizes: [64, 128, 256]
+  smoothing: "gaussian"
+  compare: ["global", "local"]
+  prevent_overfitting_via: "spatial_holdout"
+
+# Uncertainty — basic, labeled estimated, not confidence
+uncertainty:
+  label: "estimated uncertainty"
+  sources:
+    - calibration_residual
+    - dem_variability
+    - depth_variation
+  not: "statistically_complete"
+
+# Model comparison — pluggable, no switch yet
+model_comparison:
+  current: "depth-anything/Depth-Anything-V2-Small-hf"
+  pluggable_interface: "backend.depth.estimator.estimate_depth(image, backbone)"
+  future_candidates:
+    ["depth-anything/Depth-Anything-V2-Base-hf", "Intel/dpt-large"]
+  keep_evaluator_fixed: true
+
+# Hardware provenance
+hardware:
+  cpu: "Intel"
+  gpu: "none"
+  ram: "unknown"
+
+settings:
+  min_coverage_pct: 50.0
+  save_error_maps: true
+  output_dir: "outputs/calibration_rnd"
