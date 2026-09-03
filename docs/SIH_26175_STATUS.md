@@ -1,7 +1,7 @@
 # SIH 26175 — Capability Status Matrix
 
 **Date:** 2026-09-03
-**Branch:** `feat/sih-26175-calibration-rnd`
+**Branch:** `feat/sih-26175-real-benchmark`
 
 ---
 
@@ -30,24 +30,35 @@
 
 ## Geospatial Pipeline
 
-| #   | Capability                    | Status  | Evidence                                                                               | Data Type  |
-| --- | ----------------------------- | ------- | -------------------------------------------------------------------------------------- | ---------- |
-| 7   | SRTM data adapter             | PASS    | SRTMProvider loads GeoTIFF, mosaics, reprojects                                        | REAL       |
-| 8   | ISPRS Potsdam adapter         | PASS    | ISPRSAdapter structure exists                                                          | NOT TESTED |
-| 9   | Depth → elevation calibration | PARTIAL | 7 methods implemented (affine, robust, dem_residual, local_norm, inv, piecewise, freq) | SYNTHETIC  |
-| 10  | GeoTIFF export (metric DSM)   | PARTIAL | Exports with CRS/transform; calibrated from synthetic data                             | SYNTHETIC  |
-| 11  | CRS handling (EPSG:4326)      | PASS    | GeoTIFF verified with rasterio                                                         | SYNTHETIC  |
-| 12  | Slope computation             | PASS    | Unit tests verify gradient method                                                      | SYNTHETIC  |
-| 13  | Terrain classification        | PASS    | Unit tests verify 5-category output                                                    | SYNTHETIC  |
-| 14  | DSM comparison metrics        | PASS    | Unit tests verify RMSE/MAE/bias/correlation                                            | SYNTHETIC  |
+| #   | Capability                    | Status  | Evidence                                                                               | Data Type |
+| --- | ----------------------------- | ------- | -------------------------------------------------------------------------------------- | --------- |
+| 7   | SRTM data adapter             | PASS    | SRTMProvider loads GeoTIFF, mosaics, reprojects                                        | REAL      |
+| 8   | ISPRS Potsdam adapter         | PASS    | `backend/geo/potsdam_adapter.py` — discovery, inspection, loading, preparation         | REAL      |
+| 9   | Depth → elevation calibration | PARTIAL | 7 methods implemented (affine, robust, dem_residual, local_norm, inv, piecewise, freq) | SYNTHETIC |
+| 10  | GeoTIFF export (metric DSM)   | PARTIAL | Exports with CRS/transform; calibrated from synthetic data                             | SYNTHETIC |
+| 11  | CRS handling (EPSG:4326)      | PASS    | GeoTIFF verified with rasterio                                                         | SYNTHETIC |
+| 12  | Slope computation             | PASS    | Unit tests verify gradient method                                                      | SYNTHETIC |
+| 13  | Terrain classification        | PASS    | Unit tests verify 5-category output                                                    | SYNTHETIC |
+| 14  | DSM comparison metrics        | PASS    | Unit tests verify RMSE/MAE/bias/correlation                                            | SYNTHETIC |
 
 ## Calibration R&D (New)
 
+| #   | Capability                   | Status | Evidence                                                        | Data Type |
+| --- | ---------------------------- | ------ | --------------------------------------------------------------- | --------- |
+| 15  | Calibration methods registry | PASS   | `backend/calibration/methods.py` — 7 methods, unified interface | SYNTHETIC |
+| 16  | Robust calibration (RANSAC)  | PASS   | `method_robust_affine` with fallback                            | SYNTHETIC |
+| 17  | DEM residual fusion          | PASS   | `method_dem_residual` + metadata                                | SYNTHETIC |
+
+## Real Benchmark (New)
+
 | #   | Capability                            | Status | Evidence                                                                 | Data Type |
 | --- | ------------------------------------- | ------ | ------------------------------------------------------------------------ | --------- |
-| 15  | Calibration methods registry          | PASS   | `backend/calibration/methods.py` — 7 methods, unified interface          | SYNTHETIC |
-| 16  | Robust calibration (RANSAC)           | PASS   | `method_robust_affine` with fallback                                     | SYNTHETIC |
-| 17  | DEM residual fusion                   | PASS   | `method_dem_residual` + metadata                                         | SYNTHETIC |
+| 39  | Potsdam dataset adapter               | PASS   | `backend/geo/potsdam_adapter.py` — discovery, inspection, loading        | REAL      |
+| 40  | Potsdam tile preparation              | PASS   | `prepare_potsdam_for_benchmark()` — saves .npz pairs                     | REAL      |
+| 41  | Real benchmark runner                 | PASS   | `python -m eval.run_real_benchmark` — blocker detection + execution      | REAL      |
+| 42  | Real benchmark config                 | PASS   | `configs/real_benchmark.yaml` — all 7 methods enabled                    | REAL      |
+| 43  | Real data blocker detection           | PASS   | Produces `blocker_report.{json,md}` when data not available              | REAL      |
+| 44  | Potsdam adapter tests                 | PASS   | 18 tests pass, 2 integration skipped (need data)                         | REAL      |
 | 18  | Locally normalized residual fusion    | PASS   | `method_local_normalized` (patch-based z-score)                          | SYNTHETIC |
 | 19  | Inverse depth (disparity) calibration | PASS   | `method_inverse_depth` with epsilon                                      | SYNTHETIC |
 | 20  | Piecewise linear calibration          | PASS   | `method_piecewise_linear` (n_bins=3 default)                             | SYNTHETIC |
@@ -79,11 +90,11 @@
 
 ## Infrastructure
 
-| #   | Capability             | Status | Evidence                                   | Data Type |
-| --- | ---------------------- | ------ | ------------------------------------------ | --------- |
-| 36  | Benchmark (multi-size) | PASS   | 64-512px tested, results in benchmark.json | REAL      |
-| 37  | CPU inference          | PASS   | Model loads and runs on CPU                | REAL      |
-| 38  | Test suite             | PASS   | 136/136 tests pass (90 original + 46 new)  | SYNTHETIC |
+| #   | Capability             | Status | Evidence                                                       | Data Type |
+| --- | ---------------------- | ------ | -------------------------------------------------------------- | --------- |
+| 36  | Benchmark (multi-size) | PASS   | 64-512px tested, results in benchmark.json                     | REAL      |
+| 37  | CPU inference          | PASS   | Model loads and runs on CPU                                    | REAL      |
+| 38  | Test suite             | PASS   | 154/154 tests pass (90 original + 46 calibration + 18 potsdam) | REAL      |
 
 ---
 
@@ -92,67 +103,73 @@
 | Category                | PASS   | PARTIAL | FAIL  | NOT TESTED | BLOCKED |
 | ----------------------- | ------ | ------- | ----- | ---------- | ------- |
 | Core (1-6)              | 6      | 0       | 0     | 0          | 0       |
-| Geospatial (7-14)       | 5      | 3       | 0     | 1          | 0       |
+| Geospatial (7-14)       | 6      | 2       | 0     | 0          | 0       |
 | Calibration R&D (15-29) | 14     | 1       | 0     | 0          | 0       |
+| Real Benchmark (39-44)  | 6      | 0       | 0     | 0          | 0       |
 | Analysis (30-32)        | 3      | 0       | 0     | 0          | 0       |
 | Frontend (33-35)        | 2      | 1       | 0     | 0          | 0       |
 | Infrastructure (36-38)  | 3      | 0       | 0     | 0          | 0       |
-| **Total**               | **33** | **5**   | **0** | **1**      | **0**   |
+| **Total**               | **40** | **4**   | **0** | **0**      | **0**   |
 
 ---
 
 ## Known Limitations
 
-1. **No real satellite/drone imagery** — Using generic photo as proxy
-2. **No real SRTM** — OpenTopography API requires auth key (HTTP 401); local tile N18E073.tif is 90m, not 30m
-3. **No reference DSM** — Independent accuracy validation BLOCKED
-4. **No reverse proxy** — Frontend cannot reach backend API in dev mode
-5. **CPU-only inference** — 10-50x slower than GPU
-6. **Calibration values meaningless** — Derived from synthetic data / single SRTM tile without independent reference
-7. **SRTM resolution mismatch** — Documentation says 30m; actual file is 90m (3 arc-sec)
-8. **DEM vertical datum** — SRTM uses EGM96 geoid; no conversion to WGS84 ellipsoid implemented
+1. **Potsdam data not downloaded** — Adapter ready; requires manual download from ISPRS (13.3GB, password-protected)
+2. **No independent reference DSM** — Potsdam DSM used as both calibration reference and evaluation reference
+3. **No reverse proxy** — Frontend cannot reach backend API in dev mode
+4. **CPU-only inference** — 10-50x slower than GPU
+5. **SRTM resolution mismatch** — Documentation says 30m; actual file is 90m (3 arc-sec)
+6. **DEM vertical datum** — SRTM uses EGM96 geoid; Potsdam uses WGS84 ellipsoid
 
 ---
 
 ## Real Data Blocker (Explicit)
 
-**Status:** BLOCKED — No usable paired RGB + independent reference DSM datasets.
+**Status:** PARTIALLY UNBLOCKED — Potsdam adapter ready; data not yet downloaded.
 
-| Dataset           | Status           | Blocker                                                                                       |
-| ----------------- | ---------------- | --------------------------------------------------------------------------------------------- |
-| ISPRS Potsdam     | NOT AVAILABLE    | Requires registration at isprs.org; airborne (TOP), not satellite but valid for algorithm dev |
-| SIH2026 reference | NOT AVAILABLE    | github.com/IMG-PROCESS-SAC/SIH2026 not cloned; no samples in repo                             |
-| Local SRTM tile   | CALIBRATION ONLY | data/srtm/N18E073.tif (EPSG:4326, 90m) exists but no paired independent reference DSM         |
+| Dataset           | Status           | Blocker                                                                           |
+| ----------------- | ---------------- | --------------------------------------------------------------------------------- |
+| ISPRS Potsdam     | ADAPTER READY    | `backend/geo/potsdam_adapter.py` implemented; requires manual download from ISPRS |
+| SIH2026 reference | NOT AVAILABLE    | github.com/IMG-PROCESS-SAC/SIH2026 not cloned; no samples in repo                 |
+| Local SRTM tile   | CALIBRATION ONLY | data/srtm/N18E073.tif (EPSG:4326, 90m) exists for calibration source only         |
 
-**Experiment runner behavior:** When `datasets: []` in config, runner produces `outputs/calibration_rnd/blocker_report.{json,md}` and exits cleanly without fabricating numbers.
+**Real benchmark runner behavior:** When `data/potsdam/prepared/` does not exist, runner produces `outputs/real_benchmark/blocker_report.{json,md}` and exits cleanly without fabricating numbers.
+
+**Potsdam DSM note:** Potsdam DSM is used as BOTH calibration reference AND evaluation reference.
+Metrics show depth→DSM fit quality, NOT independent accuracy. This is a limitation.
 
 ---
 
 ## What Would Unlock Full Validation
 
-1. **Real paired RGB + independent DSM** (drone RGB + LiDAR DSM, or ISPRS Potsdam TOP+DSM)
-2. **OpenTopography API key** → real SRTM 30m tiles for meaningful calibration
-3. **Vertical datum conversion** — pygeoid/PROJ for EGM96 ↔ WGS84 ellipsoid
-4. **Reverse proxy (nginx/traefik)** → full frontend→backend flow
+1. **Download ISPRS Potsdam** — `data/potsdam/raw/` → run `prepare_potsdam_for_benchmark()` → `data/potsdam/prepared/`
+2. **Run real benchmark** — `python -m eval.run_real_benchmark --config configs/real_benchmark.yaml`
+3. **Obtain independent reference DSM** — LiDAR/photogrammetric DSM separate from Potsdam DSM for true independent evaluation
+4. **Vertical datum conversion** — pygeoid/PROJ for EGM96 ↔ WGS84 ellipsoid (SRTM vs Potsdam)
 5. **GPU (CUDA)** → production-speed inference
 
 ---
 
 ## Recommended Next Technical Step
 
-**Priority 1: Acquire real paired data.** Without it, numerical experiments cannot proceed beyond synthetic validation.
+**Priority 1: Download ISPRS Potsdam.** Follow `data/potsdam/README.md` instructions.
 
-- Option A: Download ISPRS Potsdam (registration required, airborne, not satellite but valid for algorithm dev)
-- Option B: Drone survey with LiDAR/photogrammetric DSM for a local site
-- Option C: Clone SIH2026 reference repo and extract samples
+- Download from seafile server (password at ISPRS website)
+- Extract to `data/potsdam/raw/`
+- Run: `python -c "from backend.geo.potsdam_adapter import prepare_potsdam_for_benchmark; prepare_potsdam_for_benchmark('data/potsdam/raw', 'data/potsdam/prepared')"`
+- Run benchmark: `python -m eval.run_real_benchmark --config configs/real_benchmark.yaml`
 
-**Priority 2: Vertical datum conversion.** SRTM uses EGM96 geoid. If reference DSM uses WGS84 ellipsoid, ~10-50m offset possible.
+**Priority 2: Evaluate results.** Check `outputs/real_benchmark/report.md` for all 7 methods.
 
-**Priority 3: Frequency fusion validation.** With scipy, test: `H_pred = affine(D) + α·highfreq(DEM)` vs `affine(D) + α·highfreq(depth)`.
+- Identify best RMSE, MAE, correlation
+- Check spatial CV results for generalization
+- Investigate failure cases
 
-**Priority 4: Local calibration evidence.** Run global vs local (64/128/256 blocks) with spatial holdout.
+**Priority 3: Obtain independent reference DSM.** Potsdam DSM is NOT independent from calibration.
 
-**Priority 5: Model comparison.** Plug in `depth-anything/Depth-Anything-V2-Base-hf` and `Intel/dpt-large` with identical evaluator.
+- Need LiDAR/photogrammetric DSM separate from Potsdam DSM
+- Or use different dataset entirely (drone survey + LiDAR)
 
 ---
 
@@ -171,6 +188,16 @@
 | `docs/CALIBRATION_AUDIT.md`            | Code audit from Step 1                              |
 | `docs/CALIBRATION_RND.md`              | This phase documentation                            |
 
+## Files Added in Real Benchmark Phase
+
+| File                             | Purpose                                  |
+| -------------------------------- | ---------------------------------------- |
+| `backend/geo/potsdam_adapter.py` | ISPRS Potsdam dataset adapter            |
+| `eval/run_real_benchmark.py`     | Real benchmark runner with blocker logic |
+| `configs/real_benchmark.yaml`    | Real benchmark configuration             |
+| `data/potsdam/README.md`         | Download and preparation instructions    |
+| `tests/test_potsdam_adapter.py`  | 18 tests for Potsdam adapter             |
+
 ---
 
-_Updated by calibration R&D phase on feat/sih-26175-calibration-rnd_
+_Updated by real benchmark phase on feat/sih-26175-real-benchmark_
