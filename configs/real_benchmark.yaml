@@ -1,0 +1,71 @@
+# Real Benchmark Configuration — ISPRS Potsdam
+# Run: python -m eval.run_real_benchmark --config configs/real_benchmark.yaml
+
+seed: 42
+model: "depth-anything/Depth-Anything-V2-Small-hf"
+device: "cpu"
+
+# Data directory — prepared Potsdam tiles (.npz)
+data_dir: "data/potsdam/prepared"
+
+# Methods to evaluate
+methods:
+  affine:
+    enabled: true
+    assumption: "Depth correlates linearly with elevation"
+    outlier_factor: 3.0
+    subsample_limit: 50000
+
+  robust_affine:
+    enabled: true
+    assumption: "Linear relation with heavy outliers; RANSAC rejects"
+
+  dem_residual:
+    enabled: true
+    assumption: "Relative component adds high-frequency detail to coarse DEM"
+    alpha: 1.0
+
+  local_normalized:
+    enabled: true
+    assumption: "Local normalization removes global bias, preserves structure"
+    patch_size: 64
+
+  inverse_depth:
+    enabled: true
+    assumption: "Inverse depth (disparity) may correlate better with elevation"
+    epsilon: 1.0e-06
+
+  piecewise_linear:
+    enabled: true
+    assumption: "Relation is nonlinear; piecewise linear approximates"
+    n_bins: 3
+
+  frequency_fusion:
+    enabled: true
+    assumption: "Coarse DEM provides low-freq, monocular adds high-freq"
+    lowpass_sigma: 10.0
+    alpha: 1.0
+
+# Alignment
+alignment:
+  required_overlap_pct: 50.0
+
+# Frequency decomposition
+frequency:
+  sigma: 10.0
+
+# Spatial cross-validation
+spatial_cv:
+  enabled: true
+  n_folds: 5
+  block_size_px: 64
+  min_separation_blocks: 2
+  seed: 42
+  min_valid_fraction: 0.1
+
+# Visualizations
+visualizations:
+  output_dir: "outputs/real_benchmark"
+
+# Output
+output_dir: "outputs/real_benchmark"
